@@ -1,5 +1,6 @@
 use crate::constant::Constant;
 use crate::function::{CallingConvention, FunctionAttribute, ParameterAttribute};
+use crate::metadata::{MetadataNodeID, MetadataRef};
 use crate::name::Name;
 use crate::operand::Operand;
 use crate::predicates::*;
@@ -264,13 +265,13 @@ impl Instruction {
     }
 }
 
-/* --TODO not yet implemented: metadata
 pub trait HasMetadata {
     fn get_metadata(&self) -> &InstructionMetadata;
 }
 
 impl HasMetadata for Instruction {
     fn get_metadata(&self) -> &InstructionMetadata {
+        /* --TODO not yet implemented
         match self {
             Instruction::Add(i) => &i.metadata,
             Instruction::Sub(i) => &i.metadata,
@@ -326,9 +327,10 @@ impl HasMetadata for Instruction {
             Instruction::CatchPad(i) => &i.metadata,
             Instruction::CleanupPad(i) => &i.metadata,
         }
+        */
+        unimplemented!("metadata")
     }
 }
-*/
 
 pub trait HasResult: Debug + Typed {
     fn get_result(&self) -> &Name;
@@ -392,14 +394,13 @@ macro_rules! impl_inst {
             }
         }
 
-        /* --TODO not yet implemented: metadata
         impl HasMetadata for $inst {
             fn get_metadata(&self) -> &InstructionMetadata {
-                &self.metadata
+                // --TODO not yet implemented-- &self.metadata
+                unimplemented!("metadata")
             }
         }
-        */
-    };
+    }
 }
 
 macro_rules! impl_hasresult {
@@ -1466,6 +1467,8 @@ impl Typed for CleanupPad {
     }
 }
 
+pub struct InstructionMetadata( pub Vec<(String, MetadataRef<MetadataNodeID>)> );
+
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum TailCallKind {
     Tail,
@@ -2478,6 +2481,16 @@ impl CleanupPad {
             },
             dest: Name::name_or_num(unsafe { get_value_name(inst) }, ctr),
             // metadata: InstructionMetadata::from_llvm_inst(inst),
+        }
+    }
+}
+
+impl InstructionMetadata {
+    pub(crate) fn from_llvm_inst(inst: LLVMValueRef) -> Self {
+        if unsafe { LLVMHasMetadata(inst) != 0 } {
+            unimplemented!("metadata")  // TODO: LLVMGetMetadata() is relevant here, but llvm-hs uses the C++ API "getAllMetadata"
+        } else {
+            InstructionMetadata(vec![])
         }
     }
 }

@@ -1,5 +1,6 @@
 use crate::constant::Constant;
 use crate::function::{Function, FunctionAttribute, GroupID};
+use crate::metadata::{MetadataNode, MetadataNodeID, MetadataNodeMap, MetadataRef};
 use crate::name::Name;
 use crate::types::{Type, Typed};
 use log::debug;
@@ -37,9 +38,12 @@ pub struct Module {
     // --TODO not yet implemented-- pub function_attribute_groups: Vec<FunctionAttributeGroup>,
     /// See [LLVM 9 docs on Module-Level Inline Assembly](https://releases.llvm.org/9.0.0/docs/LangRef.html#moduleasm)
     pub inline_assembly: String,
-    // --TODO not yet implemented-- pub metadata_nodes: Vec<(MetadataNodeID, MetadataNode)>,
-    // --TODO not yet implemented-- pub named_metadatas: Vec<NamedMetadata>,
-    // --TODO not yet implemented-- pub comdats: Vec<Comdat>,
+    /// See [LLVM 9 docs on Metadata](https://releases.llvm.org/9.0.0/docs/LangRef.html#metadata)
+    pub metadata_nodes: MetadataNodeMap,
+    /// See [LLVM 9 docs on Named Metadata](https://releases.llvm.org/9.0.0/docs/LangRef.html#namedmetadatastructure)
+    pub named_metadatas: Vec<NamedMetadata>,
+    // See [LLVM 9 docs on Comdats](https://releases.llvm.org/9.0.0/docs/LangRef.html#comdats)
+    // pub comdats: Vec<Comdat>,  // Comdats appear to not be exposed in the LLVM C API, only the C++ API
 }
 
 impl Module {
@@ -207,14 +211,12 @@ pub struct FunctionAttributeGroup {
     pub attrs: Vec<FunctionAttribute>,
 }
 
-/* --TODO not yet implemented: metadata
 /// See [LLVM 9 docs on Named Metadata](https://releases.llvm.org/9.0.0/docs/LangRef.html#named-metadata)
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct NamedMetadata {
     pub name: String,
     pub node_ids: Vec<MetadataNodeID>,
 }
-*/
 
 /// See [LLVM 9 docs on Comdats](https://releases.llvm.org/9.0.0/docs/LangRef.html#langref-comdats)
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -281,6 +283,7 @@ pub enum AlignType {
 use crate::constant::GlobalNameMap;
 use crate::from_llvm::*;
 use crate::types::TyNameMap;
+use crate::metadata::LLVMToNodeIDMap;
 use llvm_sys::{LLVMDLLStorageClass, LLVMLinkage, LLVMThreadLocalMode, LLVMUnnamedAddr, LLVMVisibility};
 use llvm_sys::comdat::*;
 
@@ -310,6 +313,8 @@ impl Module {
         global_ctr = 0; // reset the global_ctr; the second pass should number everything exactly the same though
 
         let mut tynamemap = TyNameMap::new();
+        let mut llmap: LLVMToNodeIDMap = LLVMToNodeIDMap::new();
+        let mut mnmap: MetadataNodeMap = MetadataNodeMap::new();
 
         Self {
             name: unsafe { get_module_identifier(module) },
@@ -328,8 +333,8 @@ impl Module {
             // function_attribute_groups: unimplemented!("function_attribute_groups"),  // llvm-hs collects these in the decoder monad or something
             named_struct_types: tynamemap,
             inline_assembly: unsafe { get_module_inline_asm(module) },
-            // metadata_nodes: unimplemented!("metadata_nodes"),
-            // named_metadatas: unimplemented!("named_metadatas"),
+            metadata_nodes: mnmap,
+            named_metadatas: get_named_metadatas(module).map(|nm| NamedMetadata::from_llvm_ref(nm, module, &llmap)).collect(),
             // comdats: unimplemented!("comdats"),  // I think llvm-hs also collects these along the way
         }
     }
@@ -405,13 +410,26 @@ impl GlobalAlias {
     }
 }
 
-/* --TODO not yet implemented: metadata
 impl NamedMetadata {
-    pub(crate) fn from_llvm_ref(nm: LLVMNamedMDNodeRef) -> Self {
-        unimplemented!("NamedMetadata::from_llvm_ref")
+    pub(crate) fn from_llvm_ref(nm: LLVMNamedMDNodeRef, module: LLVMModuleRef, llmap: &LLVMToNodeIDMap) -> Self {
+        let raw_name = unsafe {
+            let mut len = 0;
+            LLVMGetNamedMetadataName(nm, &mut len)
+        };
+        Self {
+            name: unsafe { raw_to_string(raw_name) },
+            node_ids: {
+                let num_nodes = unsafe { LLVMGetNamedMetadataNumOperands(module, raw_name) };
+                let mut nodes: Vec<LLVMValueRef> = Vec::with_capacity(num_nodes as usize);
+                unsafe {
+                    LLVMGetNamedMetadataOperands(module, raw_name, nodes.as_mut_ptr());
+                    nodes.set_len(num_nodes as usize);
+                }
+                nodes.into_iter().map(|node| llmap.get(&node).expect("Failed to find metadata node in map")).copied().collect()
+            }
+        }
     }
 }
-*/
 
 impl UnnamedAddr {
     pub(crate) fn from_llvm(ua: LLVMUnnamedAddr) -> Option<Self> {

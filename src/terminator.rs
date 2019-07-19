@@ -1,6 +1,6 @@
 use crate::constant::Constant;
 use crate::function::{CallingConvention, FunctionAttribute, ParameterAttribute};
-use crate::instruction::{HasResult, InlineAssembly};
+use crate::instruction::{HasMetadata, HasResult, InlineAssembly, InstructionMetadata};
 use crate::name::Name;
 use crate::operand::Operand;
 use crate::types::{Type, Typed};
@@ -50,9 +50,9 @@ impl Typed for Terminator {
     }
 }
 
-/* --TODO not yet implemented: metadata
 impl Terminator {
     pub fn get_metadata(&self) -> &InstructionMetadata {
+        /* --TODO not yet implemented
         match self {
             Terminator::Ret(t) => &t.metadata,
             Terminator::Br(t) => &t.metadata,
@@ -67,9 +67,10 @@ impl Terminator {
             Terminator::CatchSwitch(t) => &t.metadata,
             Terminator::CallBr(t) => &t.metadata,
         }
+        */
+        unimplemented!("metadata")
     }
 }
-*/
 
 macro_rules! impl_term {
     ($term:ty, $id:ident) => {
@@ -89,14 +90,13 @@ macro_rules! impl_term {
             }
         }
 
-        /* --TODO not yet implemented: metadata
         impl HasMetadata for $term {
             fn get_metadata(&self) -> &InstructionMetadata {
-                &self.metadata
+                // --TODO not yet implemented-- &self.metadata
+                unimplemented!("metadata")
             }
         }
-        */
-    };
+    }
 }
 
 macro_rules! impl_hasresult {

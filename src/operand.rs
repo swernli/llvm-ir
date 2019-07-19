@@ -1,4 +1,5 @@
 use crate::constant::Constant;
+use crate::metadata::Metadata;
 use crate::name::Name;
 use crate::types::{Type, Typed};
 use std::collections::HashMap;
@@ -12,7 +13,7 @@ pub enum Operand {
     },
     /// includes [`GlobalReference`](../constant/enum.Constant.html#variant.GlobalReference) for things like `@foo`
     ConstantOperand(Constant),
-    MetadataOperand, // --TODO not yet implemented-- MetadataOperand(Box<Metadata>),
+    MetadataOperand(Box<Metadata>),
 }
 
 impl Typed for Operand {
@@ -20,7 +21,7 @@ impl Typed for Operand {
         match self {
             Operand::LocalOperand { ty, .. } => ty.clone(),
             Operand::ConstantOperand(c) => c.get_type(),
-            Operand::MetadataOperand => Type::MetadataType,
+            Operand::MetadataOperand(_) => Type::MetadataType,
         }
     }
 }
@@ -32,6 +33,7 @@ impl Typed for Operand {
 use crate::constant::GlobalNameMap;
 use crate::from_llvm::*;
 use crate::types::TyNameMap;
+use crate::metadata::LLVMToNodeIDMap;
 use llvm_sys::LLVMValueKind;
 
 pub(crate) type ValToNameMap = HashMap<LLVMValueRef, Name>;
@@ -42,6 +44,7 @@ impl Operand {
         vnmap: &ValToNameMap,
         gnmap: &GlobalNameMap,
         tnmap: &mut TyNameMap,
+        llmap: &mut LLVMToNodeIDMap,
     ) -> Self {
         let constant = unsafe { LLVMIsAConstant(operand) };
         if !constant.is_null() {
@@ -49,7 +52,7 @@ impl Operand {
         } else if unsafe {
             LLVMGetValueKind(operand) == LLVMValueKind::LLVMMetadataAsValueValueKind
         } {
-            Operand::MetadataOperand
+            Operand::MetadataOperand(Box::new(Metadata::from_llvm_ref(operand, llmap)))
         } else {
             Operand::LocalOperand {
                 name: vnmap

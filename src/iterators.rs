@@ -20,6 +20,10 @@ pub fn get_global_aliases(module: LLVMModuleRef) -> impl Iterator<Item = LLVMVal
     GlobalAliasIterator::new(module)
 }
 
+pub fn get_named_metadatas(module: LLVMModuleRef) -> impl Iterator<Item=LLVMNamedMDNodeRef> {
+    NamedMetadataIterator::new(module)
+}
+
 pub fn get_parameters(func: LLVMValueRef) -> impl Iterator<Item = LLVMValueRef> {
     ParamIterator::new(func)
 }
@@ -82,6 +86,13 @@ iterator!(
     LLVMValueRef,
     LLVMGetFirstGlobalAlias,
     LLVMGetNextGlobalAlias
+);
+iterator!(
+    NamedMetadataIterator,
+    LLVMModuleRef,
+    LLVMNamedMDNodeRef,
+    LLVMGetFirstNamedMetadata,
+    LLVMGetNextNamedMetadata
 );
 iterator!(
     ParamIterator,

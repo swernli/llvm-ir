@@ -551,9 +551,35 @@ pub enum Virtuality {
 // ********* //
 
 use crate::from_llvm::*;
+use std::collections::HashMap;
+
+pub(crate) type LLVMToNodeIDMap = HashMap<LLVMValueRef, MetadataNodeID>;
+pub type MetadataNodeMap = HashMap<MetadataNodeID, MetadataNode>;
 
 impl Metadata {
-    pub(crate) fn from_llvm_ref(md: LLVMValueRef) -> Self {
-        unimplemented!("Metadata::from_llvm_ref");
+    pub(crate) fn from_llvm_ref(md: LLVMValueRef, llmap: &mut LLVMToNodeIDMap) -> Self {
+        let mdstr = unsafe { LLVMIsAMDString(md) };
+        if !mdstr.is_null() {
+            Metadata::String( unsafe { get_md_string(mdstr) } )
+        } else if let Some(nodeid) = llmap.get(&md) {
+            return Metadata::Node(MetadataRef::Ref(*nodeid));
+        } else {
+            let mdnode = unsafe { LLVMIsAMDNode(md) };
+            if !mdnode.is_null() {
+                // Unfortunately, looking at core.cpp, this case includes both Metadata::Node and Metadata::Value, and I don't know how to tell them apart in the LLVM C API. llvm-hs uses the C++ API here.
+                // For now we'll just assume that the Metadata::Value case never occurs.
+                let node = MetadataNode::from_llvm_ref(mdnode);
+                llmap.insert(md, node);
+                Metadata::Node(MetadataRef::Inline(Box::new(node)))
+            } else {
+                panic!("Metadata was neither an MDString nor MDNode")
+            }
+        }
+    }
+}
+
+impl MetadataNode {
+    pub(crate) fn from_llvm_ref(node: LLVMValueRef) -> Self {
+        unimplemented!("MetadataNode::from_llvm_ref")
     }
 }

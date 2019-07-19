@@ -53,10 +53,12 @@ wrap_maybe_null!(LLVMGetStructName, LLVMTypeRef, get_struct_name);
 wrap_maybe_null!(LLVMGetSection, LLVMValueRef, get_section);
 wrap_maybe_null!(LLVMGetGC, LLVMValueRef, get_gc);
 wrap!(LLVMGetBasicBlockName, LLVMBasicBlockRef, get_bb_name);
+wrap_with_len!(LLVMGetMDString, LLVMValueRef, get_md_string);
 wrap!(LLVMPrintValueToString, LLVMValueRef, print_to_string);
 // wrap!(LLVMPrintTypeToString, LLVMTypeRef, print_type_to_string);
 wrap_with_len!(LLVMGetStringAttributeKind, LLVMAttributeRef, get_string_attribute_kind);
 wrap_with_len!(LLVMGetStringAttributeValue, LLVMAttributeRef, get_string_attribute_value);
+wrap_with_len!(LLVMGetNamedMetadataName, LLVMNamedMDNodeRef, get_namedmetadata_name);
 
 // Panics if the LLVMValueRef is not a basic block
 pub unsafe fn op_to_bb(op: LLVMValueRef) -> LLVMBasicBlockRef {
@@ -83,4 +85,36 @@ impl Drop for Context {
             LLVMContextDispose(self.ctx);
         }
     }
+}
+
+/// Safe wrapper for an array of `LLVMValueMetadataEntry`, which properly disposes the array when the wrapper is dropped
+pub struct LLVMGlobalMetadataArray {
+    array: *mut LLVMValueMetadataEntry,
+    len: usize,
+}
+
+impl Drop for LLVMGlobalMetadataArray {
+    fn drop(&mut self) {
+        unsafe { LLVMDisposeValueMetadataEntries(self.array) };
+    }
+}
+
+pub unsafe fn get_raw_metadata_of_globalvar_or_func(v: LLVMValueRef) -> LLVMGlobalMetadataArray {
+    let mut len = 0;
+    let mut array = LLVMGlobalCopyAllMetadata(v, &mut len);
+    LLVMGlobalMetadataArray {
+        array,
+        len,
+    }
+}
+
+pub type ValueMetadataKind = u32;
+
+pub unsafe fn get_metadata_of_globalvar_or_func(v: LLVMValueRef) -> Vec<(ValueMetadataKind, LLVMMetadataRef)> {
+    let array = get_raw_metadata_of_globalvar_or_func(v);
+    (0 .. array.len as u32).map(|i| {
+        let kind = LLVMValueMetadataEntriesGetKind(array.array, i);
+        let mref = LLVMValueMetadataEntriesGetMetadata(array.array, i);
+        (kind, mref)
+    }).collect()
 }

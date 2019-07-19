@@ -1,6 +1,6 @@
 use super::Instruction;
 use super::{AShr, Add, And, FAdd, FDiv, FMul, FRem, FSub, LShr, Mul, Or, SDiv, SRem, Shl, Sub, UDiv, URem, Xor};
-use super::{HasResult, Name, Operand, Type, Typed};
+use super::{HasMetadata, HasResult, InstructionMetadata, Name, Operand, Type, Typed};
 use std::convert::TryFrom;
 
 /// Just the BinaryOps.  This ends up being better than a `&dyn `[`BinaryOp`](../trait.BinaryOp.html) for various reasons.
@@ -108,7 +108,6 @@ impl Typed for BinaryOp {
     }
 }
 
-/* --TODO not yet implemented: metadata
 impl HasMetadata for BinaryOp {
     fn get_metadata(&self) -> &InstructionMetadata {
         match self {
@@ -133,7 +132,6 @@ impl HasMetadata for BinaryOp {
         }
     }
 }
-*/
 
 impl HasResult for BinaryOp {
     fn get_result(&self) -> &Name {

@@ -1,5 +1,6 @@
 use crate::basicblock::BasicBlock;
 use crate::constant::Constant;
+use crate::metadata::{MetadataNode, MetadataRef};
 use crate::module::{Comdat, DLLStorageClass, Linkage, Visibility};
 use crate::name::Name;
 use crate::types::{Type, Typed};
