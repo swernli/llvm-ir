@@ -49,6 +49,25 @@ impl Module {
         self.functions.iter().find(|func| func.name == name)
     }
 
+    /// Parse the LLVM bitcode from the given memory buffer to create a `Module`
+    pub fn from_memory_buffer(memory_buffer: *mut LLVMMemoryBuffer) -> Result<Self, String> {
+        let context = crate::from_llvm::Context::new();
+
+        use llvm_sys::bit_reader::LLVMParseBitcodeInContext2;
+        let module = unsafe {
+            let mut module: mem::MaybeUninit<LLVMModuleRef> = mem::MaybeUninit::uninit();
+            let return_code =
+                LLVMParseBitcodeInContext2(context.ctx, memory_buffer, module.as_mut_ptr());
+            LLVMDisposeMemoryBuffer(memory_buffer);
+            if return_code != 0 {
+                return Err("Failed to parse bitcode".to_string());
+            }
+            module.assume_init()
+        };
+        debug!("Parsed bitcode to llvm_sys module");
+        Ok(Self::from_llvm_ref(module))
+    }
+    
     /// Parse the LLVM bitcode (.bc) file at the given path to create a `Module`
     pub fn from_bc_path(path: impl AsRef<Path>) -> Result<Self, String> {
         // implementation here inspired by the `inkwell` crate's `Module::parse_bitcode_from_path`
@@ -81,21 +100,7 @@ impl Module {
         };
         debug!("Created a MemoryBuffer");
 
-        let context = crate::from_llvm::Context::new();
-
-        use llvm_sys::bit_reader::LLVMParseBitcodeInContext2;
-        let module = unsafe {
-            let mut module: mem::MaybeUninit<LLVMModuleRef> = mem::MaybeUninit::uninit();
-            let return_code =
-                LLVMParseBitcodeInContext2(context.ctx, memory_buffer, module.as_mut_ptr());
-            LLVMDisposeMemoryBuffer(memory_buffer);
-            if return_code != 0 {
-                return Err("Failed to parse bitcode".to_string());
-            }
-            module.assume_init()
-        };
-        debug!("Parsed bitcode to llvm_sys module");
-        Ok(Self::from_llvm_ref(module))
+        from_memory_buffer(memory_buffer);
     }
 }
 
